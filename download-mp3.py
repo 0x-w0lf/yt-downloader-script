@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import argparse, sys
+import argparse, sys, os
 from pathlib import Path
 from yt_dlp import YoutubeDL
 
@@ -19,6 +19,14 @@ def build_opts(outdir, kbps, allow_playlist, cookies_from, cookies_file):
         o["cookiefile"] = cookies_file
     return o
 
+def clean_outdir_mp3(outdir: Path):
+    for p in outdir.iterdir():
+        if p.is_file() and p.suffix.lower() == ".mp3":
+            try:
+                p.unlink()
+            except Exception:
+                pass
+
 def main():
     p = argparse.ArgumentParser(prog="download-mp3", description="Download YouTube audio as MP3")
     p.add_argument("urls", nargs="*", help="Video or playlist URLs")
@@ -26,12 +34,15 @@ def main():
     p.add_argument("-q", "--quality", default="192", choices=["128","160","192","256","320"])
     p.add_argument("--allow-playlist", action="store_true")
     p.add_argument("-o", "--outdir", default=".")
-    p.add_argument("--cookies-from", dest="cookies_from", help="Browser or browser:profile (safari|chrome|brave|firefox)")
-    p.add_argument("--cookies-file", dest="cookies_file", help="Path to Netscape cookies.txt")
+    p.add_argument("--cookies-from", dest="cookies_from", help="Browser or browser:profile")
+    p.add_argument("--cookies-file", dest="cookies_file", help="Path to cookies.txt")
+    p.add_argument("--clean", action="store_true")
     a = p.parse_args()
 
     outdir = Path(a.outdir)
     outdir.mkdir(parents=True, exist_ok=True)
+    if a.clean:
+        clean_outdir_mp3(outdir)
 
     urls = list(a.urls)
     if a.file:
