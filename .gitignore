@@ -1,0 +1,14 @@
+# Created by venv; see https://docs.python.org/3/library/venv.html
+# Entorno virtual
+pyvenv.cfg
+venv/
+env/
+.venv/
+lib/
+bin/
+share/
+include/
+*.pyc
+__pycache__/
+*.py[cod]
+*$py.class
