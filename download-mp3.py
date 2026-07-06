@@ -33,13 +33,13 @@ def main():
     p.add_argument("-f", "--file", help="Text file with one URL per line")
     p.add_argument("-q", "--quality", default="192", choices=["128","160","192","256","320"])
     p.add_argument("--allow-playlist", action="store_true")
-    p.add_argument("-o", "--outdir", default=".")
+    p.add_argument("-o", "--outdir", default=str(Path.home() / "MP3"), help="Output directory (default: ~/MP3")
     p.add_argument("--cookies-from", dest="cookies_from", help="Browser or browser:profile")
     p.add_argument("--cookies-file", dest="cookies_file", help="Path to cookies.txt")
     p.add_argument("--clean", action="store_true")
     a = p.parse_args()
 
-    outdir = Path(a.outdir)
+    outdir = Path(a.outdir).expanduser().resolve()
     outdir.mkdir(parents=True, exist_ok=True)
     if a.clean:
         clean_outdir_mp3(outdir)
