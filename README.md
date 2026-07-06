@@ -1,274 +1,498 @@
-# download-mp3 — YouTube → MP3 (no metadata, no artwork)
+# download-mp3
 
-Small Python CLI that downloads **audio only** from YouTube as **MP3**, without embedding metadata or cover art. Saves to the **current directory** by default, supports playlists, browser cookies, and a `--clean` flag to free space before downloading.
+Small Python CLI to download audio from YouTube as MP3 using `yt-dlp` and FFmpeg.
 
-> Use it only for content you own or have permission to download. Respect YouTube’s Terms of Service and local laws.
+The script saves files to the current directory by default, supports individual videos, playlists, browser cookies, custom output folders, and optional cleanup of existing MP3 files.
 
----
-
-## Table of Contents
-- [English](#english)
-  - [Requirements (macOS)](#requirements-macos)
-  - [Quick Install](#quick-install)
-  - [Optional: Global Wrapper](#optional-global-wrapper)
-  - [Usage](#usage)
-  - [Options](#options)
-  - [Cookies & Auth](#cookies--auth)
-  - [macOS Permissions Tips](#macos-permissions-tips)
-  - [Output Naming](#output-naming)
-  - [Troubleshooting](#troubleshooting)
-- [Español](#español)
-  - [Requisitos (macOS)](#requisitos-macos)
-  - [Instalación Rápida](#instalación-rápida)
-  - [Opcional: Wrapper Global](#opcional-wrapper-global)
-  - [Uso](#uso)
-  - [Opciones](#opciones)
-  - [Cookies y Autenticación](#cookies-y-autenticación)
-  - [Permisos en macOS](#permisos-en-macos)
-  - [Nombres de Salida](#nombres-de-salida)
-  - [Solución de Problemas](#solución-de-problemas)
-- [Script Reference](#script-reference)
+> Use this tool only for content you own, created, licensed, or have permission to download. Respect YouTube’s Terms of Service and local laws.
 
 ---
 
-## English
+## Features
 
-### Requirements (macOS)
-- Homebrew
-- Python 3.11+ (works great with 3.13)
-- FFmpeg (via Homebrew)
-- `yt-dlp` (installed in a virtualenv)
+* Download YouTube audio as MP3.
+* Select MP3 bitrate: `128`, `160`, `192`, `256`, or `320`.
+* Save output to the current folder or a custom directory.
+* Read URLs from command arguments, a text file, or standard input.
+* Optional browser cookies support for age-restricted, logged-in, or bot-check scenarios.
+* Optional cleanup of existing `.mp3` files before downloading.
+* Playlist downloads disabled by default to avoid accidental full-channel or full-playlist downloads.
 
-### Quick Install
-```bash
-# Project layout (example)
-mkdir -p ~/sd/personalProjects/yt-downloader-script
-cd ~/sd/personalProjects/yt-downloader-script
+---
 
-# Python virtual environment
-python3 -m venv yt-downloader-script
-source yt-downloader-script/bin/activate
+## Project Structure
 
-# Dependencies inside venv
-python -m pip install -U pip -r requirements.txt
-brew install ffmpeg
-
-# Put the script at repo root (same level as the venv folder)
-# File: download-mp3.py
-chmod +x download-mp3.py
+```text
+yt-downloader-script/
+├── .gitignore
+├── README.md
+├── requirements.txt
+├── download-mp3.py
+├── scripts/
+│   └── install-wrapper.sh
+└── .venv/                  # local only, ignored by Git
 ```
 
-### Optional: Global Wrapper
-Run without activating the venv (adjust paths only if your folder differs):
+The `.venv/` folder is only for your local machine and should never be committed to GitHub.
+
+---
+
+## Requirements
+
+Tested on macOS.
+
+Required:
+
+* Python 3.11+
+* Homebrew
+* FFmpeg
+* Deno
+* `yt-dlp`
+* `yt-dlp-ejs`
+
+Install system dependencies:
+
 ```bash
-mkdir -p ~/bin
-cat > ~/bin/download-mp3 <<'SH'
-#!/usr/bin/env bash
-set -euo pipefail
-VENV="$HOME/sd/personalProjects/yt-downloader-script/yt-downloader-script"
-SCRIPT="$(dirname "$VENV")/download-mp3.py"
-if [ ! -f "$SCRIPT" ]; then
-  echo "download-mp3: script not found at: $SCRIPT" >&2
-  exit 127
-fi
-exec "$VENV/bin/python" "$SCRIPT" "$@"
-SH
-chmod +x ~/bin/download-mp3
-grep -q 'export PATH="$HOME/bin:$PATH"' ~/.zshrc || echo 'export PATH="$HOME/bin:$PATH"' >> ~/.zshrc
-source ~/.zshrc
+brew install ffmpeg deno
 ```
 
-### Usage
+`deno` is used as a JavaScript runtime for newer YouTube extraction paths supported by `yt-dlp-ejs`.
+
+---
+
+## Installation
+
+Clone the repository:
+
 ```bash
-# Help
+git clone <your-repo-url>
+cd yt-downloader-script
+```
+
+Create a virtual environment:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+```
+
+Install Python dependencies:
+
+```bash
+python -m pip install -U pip
+python -m pip install -U --pre -r requirements.txt
+```
+
+Verify the installation:
+
+```bash
+python - <<'PY'
+import yt_dlp, shutil, sys
+
+print("python:", sys.executable)
+print("yt-dlp:", yt_dlp.version.__version__)
+print("deno:", shutil.which("deno"))
+print("ffmpeg:", shutil.which("ffmpeg"))
+PY
+```
+
+---
+
+## Optional Global Command
+
+To run the script as `download-mp3` from anywhere, install the wrapper:
+
+```bash
+./scripts/install-wrapper.sh
+```
+
+Then verify:
+
+```bash
+which download-mp3
 download-mp3 -h
+```
 
-# From file (one URL per line), save into current folder
-download-mp3 -f ./urls.txt
+The wrapper expects this project to live at:
 
-# Single URL, 320 kbps
-download-mp3 -q 320 "https://www.youtube.com/watch?v=VIDEO_ID"
+```text
+~/sd/personalProjects/yt-downloader-script
+```
 
-# Read from stdin
+If your path is different, edit `scripts/install-wrapper.sh` before running it.
+
+---
+
+## Usage
+
+### Show Help
+
+```bash
+download-mp3 -h
+```
+
+Or without the wrapper:
+
+```bash
+.venv/bin/python download-mp3.py -h
+```
+
+---
+
+### Download One Video
+
+```bash
+download-mp3 'https://www.youtube.com/watch?v=VIDEO_ID'
+```
+
+With 320 kbps:
+
+```bash
+download-mp3 -q 320 'https://www.youtube.com/watch?v=VIDEO_ID'
+```
+
+Important: do not escape `?`, `=`, or `&` inside quoted URLs.
+
+Correct:
+
+```bash
+download-mp3 'https://www.youtube.com/watch?v=VIDEO_ID'
+```
+
+Incorrect:
+
+```bash
+download-mp3 'https://www.youtube.com/watch\?v\=VIDEO_ID'
+```
+
+---
+
+### Download From a File
+
+Create a text file with one URL per line:
+
+```text
+https://www.youtube.com/watch?v=VIDEO_ID_1
+https://www.youtube.com/watch?v=VIDEO_ID_2
+https://www.youtube.com/watch?v=VIDEO_ID_3
+```
+
+Then run:
+
+```bash
+download-mp3 -f urls.txt
+```
+
+---
+
+### Read URLs From Standard Input
+
+```bash
 cat urls.txt | download-mp3
-
-# Clean existing MP3s in the output folder before downloading
-download-mp3 --clean -f ./urls.txt
-
-# Use browser cookies (Chrome default profile)
-download-mp3 --cookies-from chrome:Default -f ./urls.txt
 ```
 
-### Options
+---
+
+### Save to a Custom Output Folder
+
+```bash
+download-mp3 -o ~/Downloads/music 'https://www.youtube.com/watch?v=VIDEO_ID'
 ```
+
+---
+
+### Clean Existing MP3 Files Before Downloading
+
+This deletes existing `.mp3` files in the output folder before starting the download.
+
+```bash
+download-mp3 --clean -f urls.txt
+```
+
+With a custom folder:
+
+```bash
+download-mp3 --clean -o ~/Downloads/music -f urls.txt
+```
+
+---
+
+### Allow Playlist Downloads
+
+Playlist downloads are disabled by default.
+
+To allow downloading a full playlist:
+
+```bash
+download-mp3 --allow-playlist 'https://www.youtube.com/playlist?list=PLAYLIST_ID'
+```
+
+Use this carefully. Some YouTube URLs can redirect to playlists, tabs, or channel upload lists.
+
+---
+
+## Cookies and Authentication
+
+Sometimes YouTube may require login, age verification, or bot-check validation. In those cases, use browser cookies.
+
+### Chrome
+
+```bash
+download-mp3 --cookies-from chrome:Default 'https://www.youtube.com/watch?v=VIDEO_ID'
+```
+
+### Brave
+
+```bash
+download-mp3 --cookies-from brave:Default 'https://www.youtube.com/watch?v=VIDEO_ID'
+```
+
+### Safari
+
+```bash
+download-mp3 --cookies-from safari 'https://www.youtube.com/watch?v=VIDEO_ID'
+```
+
+Safari cookies may require Full Disk Access for your terminal.
+
+On macOS:
+
+```text
+System Settings → Privacy & Security → Full Disk Access
+```
+
+Enable your terminal app, then restart the terminal.
+
+### cookies.txt
+
+You can also use a Netscape-format cookies file:
+
+```bash
+download-mp3 --cookies-file ./cookies.txt 'https://www.youtube.com/watch?v=VIDEO_ID'
+```
+
+Treat cookies as secrets:
+
+```bash
+chmod 600 cookies.txt
+```
+
+Do not commit cookies to Git.
+
+---
+
+## Command Options
+
+```text
 download-mp3 [URLs ...]
-  -f, --file FILE                    Text file with one URL per line
-  -q, --quality {128,160,192,256,320}   MP3 bitrate (default: 192)
-      --allow-playlist               Allow full playlist download
-  -o, --outdir PATH                  Output directory (default: .)
-      --cookies-from BROWSER[:PROFILE]  safari | chrome[:Default] | brave[:Default] | firefox[:profile]
-      --cookies-file PATH            Path to a Netscape cookies.txt
-      --clean                        Delete *.mp3 in outdir before downloading
+
+Options:
+  -f, --file FILE
+      Text file with one URL per line.
+
+  -q, --quality {128,160,192,256,320}
+      MP3 bitrate. Default: 192.
+
+  --allow-playlist
+      Allow full playlist downloads.
+
+  -o, --outdir PATH
+      Output directory. Default: current directory.
+
+  --cookies-from BROWSER[:PROFILE]
+      Load cookies from a browser.
+      Examples: chrome:Default, brave:Default, safari.
+
+  --cookies-file PATH
+      Path to a Netscape-format cookies.txt file.
+
+  --clean
+      Delete existing .mp3 files in the output directory before downloading.
+
   -h, --help
+      Show help.
 ```
 
-### Cookies & Auth
-If YouTube asks to sign in or throws “not a bot”, pass cookies:
+---
 
-- **Chrome default profile**
-  ```bash
-  download-mp3 --cookies-from chrome:Default -f ./urls.txt
-  ```
-- **Brave**
-  ```bash
-  download-mp3 --cookies-from brave:Default -f ./urls.txt
-  ```
-- **Safari** (Terminal needs Full Disk Access)
-  ```bash
-  download-mp3 --cookies-from safari -f ./urls.txt
-  ```
-- **cookies.txt** (exported file)
-  ```bash
-  download-mp3 --cookies-file ./cookies.txt -f ./urls.txt
-  ```
-Treat `cookies.txt` as a secret (`chmod 600 cookies.txt`) and delete it when done.
+## Output Naming
 
-### macOS Permissions Tips
-- Safari cookies live in protected folders. Go to **System Settings → Privacy & Security → Full Disk Access** and enable your Terminal (and if needed Homebrew’s `Python.app` shown in error paths).
-- Chrome/Brave/Firefox may prompt Keychain access the first time—allow it.
+Files are saved as:
 
-### Output Naming
-```
+```text
 <title> [<video_id>].mp3
 ```
 
-### Troubleshooting
-- `command not found: download-mp3` → Add the wrapper to `~/bin` and ensure `~/bin` is on `PATH`, or activate your venv first.
-- Still hitting 3.9.x Python? Ensure `which python3` points to your venv when active.
-- Safari cookies PermissionError → give Full Disk Access to Terminal (and possibly Brew’s `Python.app`), then restart Terminal.
-- Rate limited → add `--cookies-from ...` or try later.
+Example:
+
+```text
+My Song [abc123XYZ].mp3
+```
 
 ---
 
-## Español
+## Updating Dependencies
 
-### Requisitos (macOS)
-- Homebrew  
-- Python 3.11+ (ideal 3.13)  
-- FFmpeg (vía Homebrew)  
-- `yt-dlp` (instalado en un entorno virtual)
+YouTube changes frequently. If downloads start failing with errors such as `nsig extraction failed`, `SABR streaming`, or `Requested format is not available`, update `yt-dlp` inside the virtual environment:
 
-### Instalación Rápida
 ```bash
-# Estructura del proyecto (ejemplo)
-mkdir -p ~/sd/personalProjects/yt-downloader-script
 cd ~/sd/personalProjects/yt-downloader-script
+source .venv/bin/activate
 
-# Entorno virtual
-python3 -m venv yt-downloader-script
-source yt-downloader-script/bin/activate
-
-# Dependencias dentro del venv
-python -m pip install -U pip -r requirements.txt
-brew install ffmpeg
-
-# Coloca el script en la raíz del repo (mismo nivel que la carpeta del venv)
-# Archivo: download-mp3.py
-chmod +x download-mp3.py
+python -m pip install -U pip
+python -m pip install -U --pre "yt-dlp[default]" yt-dlp-ejs
+python -m pip freeze > requirements.txt
 ```
 
-### Opcional: Wrapper Global
-Para usarlo sin activar el venv (ajusta rutas solo si tu carpeta difiere):
+Then retry:
+
 ```bash
-mkdir -p ~/bin
-cat > ~/bin/download-mp3 <<'SH'
-#!/usr/bin/env bash
-set -euo pipefail
-VENV="$HOME/sd/personalProjects/yt-downloader-script/yt-downloader-script"
-SCRIPT="$(dirname "$VENV")/download-mp3.py"
-if [ ! -f "$SCRIPT" ]; then
-  echo "download-mp3: script not found at: $SCRIPT" >&2
-  exit 127
-fi
-exec "$VENV/bin/python" "$SCRIPT" "$@"
-SH
-chmod +x ~/bin/download-mp3
+download-mp3 -q 320 'https://www.youtube.com/watch?v=VIDEO_ID'
+```
+
+---
+
+## Troubleshooting
+
+### `command not found: download-mp3`
+
+Make sure `~/bin` is in your `PATH`.
+
+For zsh:
+
+```bash
 grep -q 'export PATH="$HOME/bin:$PATH"' ~/.zshrc || echo 'export PATH="$HOME/bin:$PATH"' >> ~/.zshrc
 source ~/.zshrc
 ```
 
-### Uso
+Then reinstall the wrapper:
+
 ```bash
-# Ayuda
-download-mp3 -h
-
-# Desde archivo (una URL por línea), guarda en la carpeta actual
-download-mp3 -f ./urls.txt
-
-# Una URL a 320 kbps
-download-mp3 -q 320 "https://www.youtube.com/watch?v=VIDEO_ID"
-
-# Leer desde stdin
-cat urls.txt | download-mp3
-
-# Limpiar MP3 existentes en la carpeta de salida antes de descargar
-download-mp3 --clean -f ./urls.txt
-
-# Usar cookies del navegador (perfil por defecto de Chrome)
-download-mp3 --cookies-from chrome:Default -f ./urls.txt
+./scripts/install-wrapper.sh
 ```
-
-### Opciones
-```
-download-mp3 [URLs ...]
-  -f, --file FILE                    Archivo de texto con una URL por línea
-  -q, --quality {128,160,192,256,320}   Bitrate MP3 (por defecto: 192)
-      --allow-playlist               Permite descargar playlists completas
-  -o, --outdir RUTA                  Carpeta de salida (por defecto: .)
-      --cookies-from NAVEGADOR[:PERFIL]  safari | chrome[:Default] | brave[:Default] | firefox[:perfil]
-      --cookies-file RUTA            Ruta a un cookies.txt (formato Netscape)
-      --clean                        Borra los *.mp3 del outdir antes de descargar
-  -h, --help
-```
-
-### Cookies y Autenticación
-Si YouTube pide login o “not a bot”, agrega cookies:
-
-- **Chrome (perfil por defecto)**
-  ```bash
-  download-mp3 --cookies-from chrome:Default -f ./urls.txt
-  ```
-- **Brave**
-  ```bash
-  download-mp3 --cookies-from brave:Default -f ./urls.txt
-  ```
-- **Safari** (Terminal necesita Full Disk Access)
-  ```bash
-  download-mp3 --cookies-from safari -f ./urls.txt
-  ```
-- **cookies.txt** (archivo exportado)
-  ```bash
-  download-mp3 --cookies-file ./cookies.txt -f ./urls.txt
-  ```
-Trata `cookies.txt` como un secreto (`chmod 600 cookies.txt`) y bórralo al terminar.
-
-### Permisos en macOS
-- Safari guarda cookies en carpetas protegidas. Ve a **System Settings → Privacy & Security → Full Disk Access** y habilita tu Terminal (y si hace falta el `Python.app` de Homebrew).
-- Chrome/Brave/Firefox pueden pedir acceso al Llavero la primera vez—acéptalo.
-
-### Nombres de Salida
-```
-<título> [<video_id>].mp3
-```
-
-### Solución de Problemas
-- `command not found: download-mp3` → agrega el wrapper a `~/bin` y asegúrate de que `~/bin` está en `PATH`, o activa primero tu venv.
-- Sigue saliendo Python 3.9.x → verifica que `which python3` apunte a tu venv cuando esté activo.
-- PermissionError con Safari → da Full Disk Access a Terminal (y posiblemente al `Python.app` de Brew) y reinicia la Terminal.
-- Limitado por velocidad → añade `--cookies-from ...` o intenta más tarde.
 
 ---
 
-## Script Reference
+### Wrapper Points to an Old Virtual Environment
 
-> Code in English, no comments. Includes `--clean` and cookies support.
+If you see an error like:
+
+```text
+No such file or directory: .../yt-downloader-script/yt-downloader-script/bin/python
+```
+
+your wrapper is stale.
+
+Reinstall it:
+
+```bash
+cd ~/sd/personalProjects/yt-downloader-script
+./scripts/install-wrapper.sh
+hash -r
+```
+
+---
+
+### `ffmpeg` Not Found
+
+Install FFmpeg:
+
+```bash
+brew install ffmpeg
+```
+
+Verify:
+
+```bash
+which ffmpeg
+ffmpeg -version
+```
+
+---
+
+### `deno` Not Found
+
+Install Deno:
+
+```bash
+brew install deno
+```
+
+Verify:
+
+```bash
+which deno
+deno --version
+```
+
+---
+
+### YouTube Bot Check, Login, or Age Restriction
+
+Use browser cookies:
+
+```bash
+download-mp3 --cookies-from chrome:Default 'https://www.youtube.com/watch?v=VIDEO_ID'
+```
+
+Or:
+
+```bash
+download-mp3 --cookies-from brave:Default 'https://www.youtube.com/watch?v=VIDEO_ID'
+```
+
+---
+
+### `Requested format is not available`
+
+Update `yt-dlp` and `yt-dlp-ejs`:
+
+```bash
+source .venv/bin/activate
+python -m pip install -U --pre "yt-dlp[default]" yt-dlp-ejs
+```
+
+Then retry with cookies if needed.
+
+---
+
+## Development Notes
+
+Run the script directly during development:
+
+```bash
+source .venv/bin/activate
+python download-mp3.py -h
+```
+
+Check Git status before committing:
+
+```bash
+git status --short
+```
+
+Expected tracked project files:
+
+```text
+.gitignore
+README.md
+requirements.txt
+download-mp3.py
+scripts/install-wrapper.sh
+```
+
+Expected ignored local files:
+
+```text
+.venv/
+*.mp3
+cookies.txt
+.DS_Store
+```
+
+---
+
+## Disclaimer
+
+This project is not affiliated with YouTube, Google, FFmpeg, or yt-dlp. It is a small personal CLI wrapper around `yt-dlp` for permitted audio downloads.
+
